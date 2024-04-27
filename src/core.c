@@ -141,7 +141,7 @@ void set_connection_state(struct connection *c, enum connection_state state)
 
 static void init_connection(struct connection *cn)
 {
-	cn->header_input.state = 0;
+	cn->header_input.state = ST_INIT;
 	cn->output.start = cn->output.end = cn->output.floor;
 	init_request(cn->r);
 	cn->keepalive = 0;
@@ -508,7 +508,7 @@ static int scan_request(struct connection *cn)
 
 	s = cn->header_input.middle;
 	state = cn->header_input.state;
-	while (state != 8 && s < cn->header_input.end) {
+	while (state != ST_END && s < cn->header_input.end) {
 		c = *s++;
 		if (c == 0) {
 			log_d("read_connection: NUL in headers");
@@ -516,17 +516,17 @@ static int scan_request(struct connection *cn)
 			return -1;
 		}
 		switch (state) {
-		case 0:
+		case ST_INIT:
 			switch (c) {
 			default:
-				state = 1;
+				state = ST_NOSPC;
 				break;
 			case '\r':
 			case '\n':
 				break;
 			case ' ':
 			case '\t':
-				state = 2;
+				state = ST_SPC;
 				break;
 			}
 			if (state) {
@@ -534,99 +534,99 @@ static int scan_request(struct connection *cn)
 				set_connection_state(cn, HC_READING);
 			}
 			break;
-		case 1:
+		case ST_NOSPC:
 			switch (c) {
 			default:
 				break;
 			case ' ':
 			case '\t':
-				state = 2;
+				state = ST_SPC;
 				break;
 			case '\r':
-				state = 3;
+				state = ST_CR0;
 				break;
 			case '\n':
-				state = 8;
+				state = ST_END;
 				break;
 			}
 			break;
-		case 2:
+		case ST_SPC:
 			switch (c) {
 			case 'H':
-				state = 4;
+				state = ST_HEADER;
 				break;
 			default:
-				state = 1;
+				state = ST_NOSPC;
 				break;
 			case ' ':
 			case '\t':
 				break;
 			case '\r':
-				state = 3;
+				state = ST_CR0;
 				break;
 			case '\n':
-				state = 8;
+				state = ST_END;
 				break;
 			}
 			break;
-		case 3:
+		case ST_CR0:
 			switch (c) {
 			case '\n':
-				state = 8;
+				state = ST_END;
 				break;
 			default:
-				state = 1;
+				state = ST_NOSPC;
 				break;
 			case ' ':
 			case '\t':
-				state = 2;
+				state = ST_SPC;
 				break;
 			case '\r':
 				break;
 			}
 			break;
-		case 4:
+		case ST_HEADER:
 			switch (c) {
 			case '\r':
-				state = 5;
+				state = ST_CR1;
 				break;
 			case '\n':
-				state = 6;
+				state = ST_LF1;
 				break;
 			}
 			break;
-		case 5:
-			switch (c) {
-			default:
-				state = 4;
-			case '\r':
-				break;
-			case '\n':
-				state = 6;
-				break;
-			}
-			break;
-		case 6:
-			switch (c) {
-			case '\r':
-				state = 7;
-				break;
-			case '\n':
-				state = 8;
-				break;
-			default:
-				state = 4;
-				break;
-			}
-			break;
-		case 7:
+		case ST_CR1:
 			switch (c) {
 			default:
-				state = 4;
+				state = ST_HEADER;
 			case '\r':
 				break;
 			case '\n':
-				state = 8;
+				state = ST_LF1;
+				break;
+			}
+			break;
+		case ST_LF1:
+			switch (c) {
+			case '\r':
+				state = ST_CR2;
+				break;
+			case '\n':
+				state = ST_END;
+				break;
+			default:
+				state = ST_HEADER;
+				break;
+			}
+			break;
+		case ST_CR2:
+			switch (c) {
+			default:
+				state = ST_HEADER;
+			case '\r':
+				break;
+			case '\n':
+				state = ST_END;
 				break;
 			}
 			break;
@@ -634,7 +634,7 @@ static int scan_request(struct connection *cn)
 	}
 	cn->header_input.state = state;
 	cn->header_input.middle = s;
-	if (state == 8) {
+	if (state == ST_END) {
 		if (process_request(cn->r) == -1) {
 			switch (cn->connection_state) {
 			case HC_FORKED:

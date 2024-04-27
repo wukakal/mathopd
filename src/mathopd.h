@@ -128,6 +128,18 @@ enum {
 	SI_CHANGETOOWNER
 };
 
+enum {
+	ST_INIT,
+	ST_NOSPC,
+	ST_SPC,
+	ST_CR0,
+	ST_HEADER,
+	ST_CR1,
+	ST_LF1,
+	ST_CR2,
+	ST_END
+};
+
 struct pool {
 	char *floor;
 	char *ceiling;
