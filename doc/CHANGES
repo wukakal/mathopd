@@ -27,3 +27,6 @@ The following keywords have been added:
 	NumProcesses
 	PID
 	SanitizePath
+
+Mathopd will drop the connection when it detects a TLS handshake,
+instead of logging a cryptic error message.
