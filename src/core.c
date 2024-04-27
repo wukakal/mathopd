@@ -523,6 +523,7 @@ static int scan_request(struct connection *cn)
 				break;
 			case '\r':
 			case '\n':
+				state = ST_INITCRLF;
 				break;
 			case ' ':
 			case '\t':
@@ -532,6 +533,25 @@ static int scan_request(struct connection *cn)
 			if (state) {
 				gettimeofday(&cn->itv, 0);
 				set_connection_state(cn, HC_READING);
+			}
+			if (c == 22) { /* TLS Handshake */
+				log_d("TLS handshake detected, dropping connection");
+				close_connection(cn);
+				return -1;
+			}
+			break;
+		case ST_INITCRLF:
+			switch (c) {
+			default:
+				state = ST_NOSPC;
+				break;
+			case '\r':
+			case '\n':
+				break;
+			case ' ':
+			case '\t':
+				state = ST_SPC;
+				break;
 			}
 			break;
 		case ST_NOSPC:

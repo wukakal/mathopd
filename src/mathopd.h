@@ -137,7 +137,8 @@ enum {
 	ST_CR1,
 	ST_LF1,
 	ST_CR2,
-	ST_END
+	ST_END,
+	ST_INITCRLF
 };
 
 struct pool {
